@@ -9,6 +9,8 @@ pandas = "*"
 structlog = "*"
 colorama = "*"
 better-exceptions = "*"
+requests = "*"
+beautifulsoup4 = "*"
 
 [dev-packages]
 
