@@ -6,6 +6,9 @@ name = "pypi"
 [packages]
 numpy = "*"
 pandas = "*"
+structlog = "*"
+colorama = "*"
+better-exceptions = "*"
 
 [dev-packages]
 
