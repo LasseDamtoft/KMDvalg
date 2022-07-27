@@ -12,8 +12,7 @@ class KMDValg:
     def run(self):
         np.arange(5)
         letters = self.get_letters()
-        areas = self.get_areas()
-        local_areas = areas[areas.area == areas.parentarea].drop('parentarea',axis=1).reset_index(drop=True)
+        local_areas, hierachy = self.get_areas()
         local_areas['tmp'] = letters['tmp'] = 1
         area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
         return area_parties
@@ -25,7 +24,17 @@ class KMDValg:
                 'url': ['R84712']
             }
         )
-        return self.areas(search_df)
+        res = self.areas(search_df)
+        search_df_res = res.merge(
+            search_df,
+            left_on='parent',
+            right_on='area',
+            suffixes=[f'_bot', '']
+        )
+        hierachy = search_df_res.loc[:, search_df_res.columns.str.contains('parent')].copy()
+        bot_res = search_df_res.iloc[:, :2].copy()
+        bot_res.columns = ['area', 'url']
+        return bot_res, hierachy
 
     def get_letters(self):
         self.logger.info(f'Getting party letters')
@@ -41,7 +50,7 @@ class KMDValg:
         )
         return parti_bogstaver
 
-    def areas(self, search_df):
+    def areas(self, search_df, level=0):
         search_df_res = pd.DataFrame()
         for _, row in search_df.iterrows():
             with requests.Session() as s:
@@ -52,20 +61,26 @@ class KMDValg:
             if results:
                 search_df_loop = pd.DataFrame(
                     {
-                        'area': [link.text for link in results.find_all("a")],
+                        f'area': [link.text for link in results.find_all("a")],
                         'url': [link['href'].replace('.htm', '') for link in results.find_all("a")]
                     }
                 )
             else:
                 search_df_loop = pd.DataFrame(
                     {
-                        'area': [row.area],
+                        f'area': [row.area],
                         'url': [row.url.replace('.htm', '')]
                     }
                 )
-            search_df_loop['parentarea'] = row.area
+            search_df_loop['parent'] = row.area
             search_df_res = pd.concat([search_df_res, search_df_loop])
-        further_search = search_df_res[search_df_res.area != search_df_res.parentarea].copy()
+        further_search = search_df_res[search_df_res.area != search_df_res.parent].copy()
         if not further_search.empty:
-            search_df_res = pd.concat([search_df_res, self.areas(further_search)])
-        return search_df_res.reset_index(drop=True)
+            search_sub = self.areas(further_search, level=level + 1)
+            search_df_res = search_sub.merge(
+                search_df_res,
+                left_on='parent',
+                right_on='area',
+                suffixes=[f'_bot{level}', '']
+            )
+        return search_df_res
