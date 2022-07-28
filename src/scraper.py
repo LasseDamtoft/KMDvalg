@@ -40,8 +40,8 @@ class KMDScraper:
         soup = BeautifulSoup(resp.content, "html.parser")
         votes_loop = pd.DataFrame(
             {
-                'area': area.area,
                 'url_letter': area.url_letter,
+                'url': area.url,
                 'name': [
                     name.text for name in soup.find_all(
                         "div",
@@ -96,6 +96,8 @@ class KMDScraper:
         search_df_res.loc[:, search_df_res.columns.str.contains('url')] = temp.fillna(method='bfill').T
         temp = search_df_res.loc[:, search_df_res.columns.str.contains('area')].T
         search_df_res.loc[:, search_df_res.columns.str.contains('area')] = temp.fillna(method='bfill').T
+        temp = search_df_res.loc[:, search_df_res.columns.str.contains('parent')].T
+        search_df_res.loc[:, search_df_res.columns.str.contains('parent')] = temp.fillna(method='bfill').T
         search_df_res = search_df_res[(search_df_res.url_bot1 == search_df_res.url_bot0)].reset_index(drop=True).copy()
         return search_df_res
 
@@ -114,7 +116,7 @@ class KMDScraper:
             )
         self.logger.info(f'Fetching personal votes done')
         votes = pd.concat(votes_loop)
-        votes_merged = area_parties.merge(votes, on=['area', 'url_letter'], how='outer')
+        votes_merged = area_parties.merge(votes, on=['url', 'url_letter'], how='outer')
         return votes_merged
 
     def get_letters(self, url, region_url):

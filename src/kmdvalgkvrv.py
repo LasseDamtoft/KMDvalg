@@ -19,7 +19,7 @@ class KMDValgKVRV:
         local_areas['tmp'] = letters['tmp'] = 1
         area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
         votes = self.kmd_scraper.fetch_candidate_votes(area_parties)
-        votes_hierachy = votes.merge(hierachy, left_on=['area', 'url'], right_on=['stemmested', 'url'])
+        votes_hierachy = votes.merge(hierachy, on='url')
         votes_csv_ready = votes_hierachy[
             ['kommune', 'stemmested', 'parti', 'url_letter', 'name', 'personal_votes']
         ].copy()

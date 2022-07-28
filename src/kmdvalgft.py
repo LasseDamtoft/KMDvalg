@@ -20,7 +20,7 @@ class KMDValgFT:
         local_areas['tmp'] = letters['tmp'] = 1
         area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
         votes = self.kmd_scraper.fetch_candidate_votes(area_parties)
-        votes_hierachy = votes.merge(hierachy, left_on='area', right_on='stemmested')
+        votes_hierachy = votes.merge(hierachy, on='url')
         votes_csv_ready = votes_hierachy[
             ['kommune', 'stemmested', 'parti', 'url_letter', 'name', 'personal_votes']
         ].copy()
@@ -54,14 +54,7 @@ class KMDValgFT:
         ) | search_df_res.columns.str.contains('storkreds')
         ].copy().sort_values(['storkreds', 'parent'])
         hierachy.columns = ['stemmested', 'kommune', 'kreds', 'storkreds']
-        na_mask = hierachy.stemmested.isna()
-        hierachy = hierachy.fillna({'stemmested': hierachy.kommune})
-        hierachy.loc[na_mask, 'kommune'] = hierachy.loc[na_mask, 'kreds']
-        temp = search_df_res.loc[:, search_df_res.columns.str.contains('url')].T
-        search_df_res.loc[:, search_df_res.columns.str.contains('url')] = temp.fillna(method='bfill').T
-        temp = search_df_res.loc[:, search_df_res.columns.str.contains('area')].T
-        search_df_res.loc[:, search_df_res.columns.str.contains('area')] = temp.fillna(method='bfill').T
-        search_df_res = search_df_res[(search_df_res.url_bot1 == search_df_res.url_bot0)].reset_index(drop=True).copy()
+        hierachy['url'] = search_df_res.iloc[:, 1:2]
         bot_res = search_df_res.iloc[:, :2].copy()
         bot_res.columns = ['area', 'url']
         return bot_res, hierachy
