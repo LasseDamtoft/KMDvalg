@@ -28,7 +28,7 @@ class KMDValg:
         votes_csv_ready.columns = [
             'kommune', 'stemmested', 'parti', 'partibogstav', 'kandidat_navn', 'personlige_stemmer'
         ]
-        votes_csv_ready.to_csv(path)
+        votes_csv_ready.to_csv(f'{self.region_url}_{path}')
         return votes_csv_ready
 
     def fetch_candidate_votes(self, area_parties):
