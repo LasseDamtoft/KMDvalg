@@ -8,9 +8,9 @@ from bs4 import BeautifulSoup
 
 
 class KMDValg:
-    def __init__(self, logger, processes=12, region_url='R84712'):
+    def __init__(self, logger, processes=12, region_url='R84712', base_url='https://www.kmdvalg.dk/rv/2021/'):
         self.logger = logger
-        self.base_url = 'https://www.kmdvalg.dk/rv/2021/'
+        self.base_url = base_url
         self.region_url = region_url
         self.processes = processes
 
@@ -64,7 +64,6 @@ class KMDValg:
             suffixes=('_bot', '')
         )
         hierachy = search_df_res.loc[:, search_df_res.columns.str.contains('parent')].copy()
-        assert hierachy.shape[1] == 3
         hierachy2 = hierachy.iloc[:, 0:2]
         hierachy2.columns = ['stemmested', 'kommune']
         bot_res = search_df_res.iloc[:, :2].copy()
