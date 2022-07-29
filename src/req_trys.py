@@ -6,7 +6,7 @@ import requests
 
 def req_trys(url, logger, method='get', max_trys=5):
     trys = 0
-    max_trys -= max_trys
+    max_trys -= 1
     while trys <= max_trys:
         try:
             with requests.Session() as s:
