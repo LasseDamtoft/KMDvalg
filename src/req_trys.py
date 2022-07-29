@@ -14,6 +14,7 @@ def req_trys(url, logger, method='get', max_trys=10):
                     resp = s.get(url)
                 elif method == 'post':
                     resp = s.post(url)
+            resp.raise_for_status()
             return resp
         except:
             trys += 1
