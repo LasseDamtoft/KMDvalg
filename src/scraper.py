@@ -56,6 +56,7 @@ class KMDScraper:
                 ]
             }
         )
+        votes_loop.personal_votes = pd.to_numeric(votes_loop.personal_votes.str.replace('.', '', regex=False))
         return votes_loop
 
     def areas(self, search_df, level=0):
