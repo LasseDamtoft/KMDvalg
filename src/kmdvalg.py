@@ -82,10 +82,11 @@ class KMDValg:
         storkredse = all_results.find_all(class_='list-group-item')
         storkredse_df = pd.DataFrame(
             {
-                f'area': [st.text for st in storkredse],
+                f'area': [st.text.strip() for st in storkredse],
                 'url': [
-                    st.get('href').replace('.htm', '') if isinstance(st.get('href'), str) else st.get('href') for st
-                    in storkredse
+                    st.get('href').replace('.htm', '').strip() if isinstance(
+                        st.get('href'), str
+                    ) else st.get('href') for st in storkredse
                 ]
             }
         )

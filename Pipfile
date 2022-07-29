@@ -11,6 +11,7 @@ colorama = "*"
 better-exceptions = "*"
 requests = "*"
 beautifulsoup4 = "*"
+tqdm = "*"
 
 [dev-packages]
 

@@ -1,6 +1,8 @@
 import multiprocessing
+from functools import partial
 
 import pandas as pd
+import tqdm
 from bs4 import BeautifulSoup
 
 from req_trys import req_trys
@@ -13,29 +15,31 @@ class KMDScraper:
         self.base_url = base_url
 
     @staticmethod
-    def fetch_area(row, url, logger):
+    def fetch_area(args):
+        row, url, logger = args[0], args[1], args[2]
         resp = req_trys(url, logger)
         soup = BeautifulSoup(resp.content, "html.parser")
         results = soup.find(id='vote-areas')
         if results:
             search_df_loop = pd.DataFrame(
                 {
-                    f'area': [link.text for link in results.find_all("a")],
-                    'url': [link['href'].replace('.htm', '') for link in results.find_all("a")]
+                    f'area': [link.text.strip() for link in results.find_all("a")],
+                    'url': [link['href'].replace('.htm', '').strip() for link in results.find_all("a")]
                 }
             )
         else:
             search_df_loop = pd.DataFrame(
                 {
-                    f'area': [row.area],
-                    'url': [row.url.replace('.htm', '')]
+                    f'area': [row.area.strip()],
+                    'url': [row.url.replace('.htm', '').strip()]
                 }
             )
         search_df_loop['parent'] = row.area
         return search_df_loop
 
     @staticmethod
-    def fetch_personal_votes(area, url, logger):
+    def fetch_personal_votes(args):
+        area, url, logger = args[0], args[1], args[2]
         resp = req_trys(url, logger)
         soup = BeautifulSoup(resp.content, "html.parser")
         votes_loop = pd.DataFrame(
@@ -43,13 +47,13 @@ class KMDScraper:
                 'url_letter': area.url_letter,
                 'url': area.url,
                 'name': [
-                    name.text for name in soup.find_all(
+                    name.text.strip() for name in soup.find_all(
                         "div",
                         class_='table-like-cell col-xs-7 col-sm-6 col-md-6 col-lg-8'
                     )
                 ],
                 'personal_votes': [
-                    personal_votes.text for personal_votes in soup.find_all(
+                    personal_votes.text.strip() for personal_votes in soup.find_all(
                         'div',
                         class_='table-like-cell col-xs-5 col-sm-6 col-md-6 col-lg-4 text-right roboto-bold'
                     )
@@ -61,17 +65,22 @@ class KMDScraper:
 
     def areas(self, search_df, level=0):
         self.logger.info(f'Fetching areas level {level}')
+        search_df_loop = []
         with multiprocessing.Pool(self.processes) as pool:
-            search_df_loop = pool.starmap(
-                self.fetch_area,
-                [
-                    (
-                        row,
-                        self.base_url + row.url + '.htm',
-                        self.logger
-                    ) for _, row in search_df.iterrows()
-                ]
-            )
+            for res in tqdm.tqdm(
+                pool.imap(
+                    partial(self.fetch_area),
+                    [
+                        (
+                            row,
+                            self.base_url + row.url + '.htm',
+                            self.logger
+                        ) for _, row in search_df.iterrows()
+                    ]
+                ), total=len(search_df)
+            ):
+                search_df_loop.append(res)
+
         search_df_res = pd.concat(search_df_loop)
         further_search = search_df_res[search_df_res.area != search_df_res.parent].copy()
         if not further_search.empty:
@@ -104,17 +113,21 @@ class KMDScraper:
 
     def fetch_candidate_votes(self, area_parties):
         self.logger.info(f'Fetching personal votes')
+        votes_loop = []
         with multiprocessing.Pool(self.processes) as pool:
-            votes_loop = pool.starmap(
-                self.fetch_personal_votes,
-                [
-                    (
-                        area,
-                        self.base_url + area.url + area.url_letter + '.htm',
-                        self.logger
-                    ) for _, area in area_parties.iterrows()
-                ]
-            )
+            for res in tqdm.tqdm(
+                pool.imap(
+                    partial(self.fetch_personal_votes),
+                    [
+                        (
+                            area,
+                            self.base_url + area.url + area.url_letter + '.htm',
+                            self.logger
+                        ) for _, area in area_parties.iterrows()
+                    ]
+                ), total=len(area_parties)
+            ):
+                votes_loop.append(res)
         self.logger.info(f'Fetching personal votes done')
         votes = pd.concat(votes_loop)
         votes_merged = area_parties.merge(votes, on=['url', 'url_letter'], how='outer')
@@ -127,11 +140,11 @@ class KMDScraper:
         results = soup.find("div", class_='col-xs-12 col-sm-6 col-md-8 content-block kmd-parti-list')
         parti_bogstaver = pd.DataFrame(
             {
-                'parti': [link.text for link in results.find_all("a")],
+                'parti': [link.text.strip() for link in results.find_all("a")],
                 'url_letter': [
                     link['href'].lower().replace(
                         region_url.lower(), ''
-                    ).replace('.htm', '') for link in results.find_all("a")
+                    ).replace('.htm', '').strip() for link in results.find_all("a")
                 ]
             }
         )
