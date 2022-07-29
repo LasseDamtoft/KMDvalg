@@ -4,7 +4,7 @@ import numpy as np
 import requests
 
 
-def req_trys(url, logger, method='get', max_trys=5):
+def req_trys(url, logger, method='get', max_trys=10):
     trys = 0
     max_trys -= 1
     while trys <= max_trys:
