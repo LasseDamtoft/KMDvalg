@@ -22,7 +22,7 @@ class KMDValg:
         self.processes = processes
 
     def scrape_kv_to_csv(self, path='personlige_stemmer_pr_stemmested.csv'):
-        np.arange(5)
+        time_start = pd.Timestamp.utcnow()
         kmd_scraper = KMDScraper(self.logger, self.processes, self.base_url_rv)
         letters = kmd_scraper.get_letters(f'{self.base_url_rv}{self.region_url}.htm', self.region_url)
         local_areas, hierachy = self.get_areas_kv(kmd_scraper)
@@ -37,9 +37,13 @@ class KMDValg:
             'kommune', 'stemmested', 'parti', 'partibogstav', 'kandidat_navn', 'personlige_stemmer'
         ]
         votes_csv_ready.to_csv(f'{self.region_url}_2{path}')
+        self.logger.info(
+            f'Fetched results in {np.round((pd.Timestamp.utcnow() - time_start).value / 1000000000, 2)} seconds'
+        )
         return votes_csv_ready
 
     def scrape_ft_to_csv(self, path='personlige_stemmer_pr_stemmested.csv'):
+        time_start = pd.Timestamp.utcnow()
         kmd_scraper = KMDScraper(self.logger, self.processes, self.base_url_ft)
         letters = kmd_scraper.get_letters(f'{self.base_url_ft}F1003.htm', 'F1003')
         local_areas, hierachy = self.get_areas_ft(kmd_scraper)
@@ -55,6 +59,9 @@ class KMDValg:
             'personlige_stemmer'
         ]
         votes_csv_ready.to_csv(f'{path}')
+        self.logger.info(
+            f'Fetched results in {np.round((pd.Timestamp.utcnow() - time_start).value / 1000000000, 2)} seconds'
+        )
         return votes_csv_ready
 
     def get_areas_kv(self, kmd_scraper):
