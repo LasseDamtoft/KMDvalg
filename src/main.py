@@ -1,13 +1,23 @@
+import pandas as pd
+
 from kmdvalg import KMDValg
 from loginit import LogInitializer
 
 if __name__ == '__main__':
     logger = LogInitializer().logger
     kmd_scraper = KMDValg(logger, processes=12)
-    res_rv = kmd_scraper.scrape_general('rv')
-    res_kv = kmd_scraper.scrape_general('kv')
-    res_ft = kmd_scraper.scrape_general('ft')
-    # res_kv = pd.read_csv('personlige_stemmer_pr_stemmested_KV.csv')
+    try:
+        res_kv = pd.read_csv('personlige_stemmer_pr_stemmested_KV.csv')
+    except:
+        res_kv = kmd_scraper.scrape_general('kv')
+    try:
+        res_rv = pd.read_csv('personlige_stemmer_pr_stemmested_RV.csv')
+    except:
+        res_rv = kmd_scraper.scrape_general('rv')
+    try:
+        res_ft = pd.read_csv('personlige_stemmer_pr_stemmested_FT.csv')
+    except:
+        res_ft = kmd_scraper.scrape_general('ft')
     md_res = res_rv[res_rv.kandidat_navn == 'Mads Duedahl, Aalborg'].personlige_stemmer.sum()
     pbl_res = res_kv[res_kv.kandidat_navn == 'Per Bach Laursen'].personlige_stemmer.sum()
     sl_res = res_rv[res_rv.kandidat_navn == 'Stephanie Lose, Esbjerg'].personlige_stemmer.sum()
