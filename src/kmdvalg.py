@@ -60,20 +60,20 @@ class KMDValg:
             f'Fetching results for {file_ext}'
         )
         kmd_scraper = KMDScraper(self.logger, self.processes, baseurl)
+        local_areas, hierachy, areas_with_distinct_parties = getareas(kmd_scraper)
+        letters = kmd_scraper.get_letters_kvrv(f'{baseurl}', areas_with_distinct_parties)
+
         if valg.lower() == 'kv' or valg.lower() == 'rv':
-            local_areas, hierachy, areas_with_distinct_parties = getareas(kmd_scraper)
-            letters = kmd_scraper.get_letters_kvrv(f'{baseurl}', areas_with_distinct_parties)
             local_areas['masterurl'] = local_areas.url.str[0:letters.url.str.len().unique().item()]
             area_parties = local_areas.merge(
                 letters, left_on='masterurl', right_on='url', suffixes=('', '_w'), how='left'
             ).drop(['masterurl', 'url_w'], axis=1)
         elif valg.lower() == 'ft':
-            letters = kmd_scraper.get_letters(f'{baseurl}F1003.htm', 'F1003')
-            local_areas, hierachy = getareas(kmd_scraper)
             local_areas['tmp'] = letters['tmp'] = 1
             area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
         else:
             return pd.DataFrame()
+
         votes = kmd_scraper.fetch_candidate_votes(area_parties)
         votes_hierachy = votes.merge(hierachy, on='url')
         votes_csv_ready = votes_hierachy[og_cols].copy()
@@ -85,21 +85,8 @@ class KMDValg:
         )
         return votes_csv_ready
 
-    def get_areas_ft(self, kmd_scraper):
-        resp = req_trys('https://www.kmdvalg.dk/fv/2019/KMDValgFV.html', self.logger)
-        soup = BeautifulSoup(resp.content, "html.parser")
-        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
-        storkredse = all_results.find_all(class_='list-group-item')
-        storkredse_df = pd.DataFrame(
-            {
-                f'area': [st.text.strip() for st in storkredse],
-                'url': [
-                    st.get('href').replace('.htm', '').strip() if isinstance(
-                        st.get('href'), str
-                    ) else st.get('href') for st in storkredse
-                ]
-            }
-        )
+    def get_areas_ft(self, kmd_scraper, url='https://www.kmdvalg.dk/fv/2019/KMDValgFV.html'):
+        storkredse_df = self.get_df(url)
         storkredse_df['storkreds'] = np.where(storkredse_df.url.isna(), storkredse_df.area, np.nan)
         storkredse_df['storkreds'] = storkredse_df['storkreds'].fillna(method='ffill')
         kredse_df = storkredse_df[~storkredse_df.url.isna()]
@@ -113,23 +100,17 @@ class KMDValg:
         hierachy['url'] = search_df_res.iloc[:, 1:2]
         bot_res = search_df_res.iloc[:, :2].copy()
         bot_res.columns = ['area', 'url']
-        return bot_res, hierachy
-
-    def get_areas_rv(self, kmd_scraper, url='https://www.kmdvalg.dk/rv/2021/KMDValgRV.html'):
-        resp = req_trys(url, self.logger)
-        soup = BeautifulSoup(resp.content, "html.parser")
-        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
-        regioner = all_results.find_all(class_='list-group-item')
-        regioner_df = pd.DataFrame(
+        ft_letter_areas = pd.DataFrame(
             {
-                f'area': [st.text.strip() for st in regioner],
-                'url': [
-                    st.get('href').replace('.htm', '').strip() if isinstance(
-                        st.get('href'), str
-                    ) else st.get('href') for st in regioner
-                ]
+                'area': ['Denmark'],
+                'url': ['F1003'],
+                'region': ['Denmark']
             }
         )
+        return bot_res, hierachy, ft_letter_areas
+
+    def get_areas_rv(self, kmd_scraper, url='https://www.kmdvalg.dk/rv/2021/KMDValgRV.html'):
+        regioner_df = self.get_df(url)
         regioner_df['region'] = np.where(
             regioner_df.url.str.len() == regioner_df.url.str.len().min(),
             regioner_df.area,
@@ -151,20 +132,7 @@ class KMDValg:
         return bot_res, hierachy, region_url
 
     def get_areas_kv(self, kmd_scraper, url='https://www.kmdvalg.dk/kv/2021/KMDValgKV.html'):
-        resp = req_trys(url, self.logger)
-        soup = BeautifulSoup(resp.content, "html.parser")
-        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
-        kommuner = all_results.find_all(class_='list-group-item')
-        kommuner_df = pd.DataFrame(
-            {
-                f'area': [st.text.strip() for st in kommuner],
-                'url': [
-                    st.get('href').replace('.htm', '').strip() if isinstance(
-                        st.get('href'), str
-                    ) else st.get('href') for st in kommuner
-                ]
-            }
-        )
+        kommuner_df = self.get_df(url)
 
         kommuner_df = kommuner_df[~kommuner_df.url.isna()].copy().reset_index(drop=True)
         search_df_res = kmd_scraper.area_wrap(kommuner_df)
@@ -177,3 +145,20 @@ class KMDValg:
         bot_res = search_df_res.iloc[:, :2].copy()
         bot_res.columns = ['area', 'url']
         return bot_res, hierachy, kommuner_df
+
+    def get_df(self, url):
+        resp = req_trys(url, self.logger)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
+        storkredse = all_results.find_all(class_='list-group-item')
+        storkredse_df = pd.DataFrame(
+            {
+                f'area': [st.text.strip() for st in storkredse],
+                'url': [
+                    st.get('href').replace('.htm', '').strip() if isinstance(
+                        st.get('href'), str
+                    ) else st.get('href') for st in storkredse
+                ]
+            }
+        )
+        return storkredse_df

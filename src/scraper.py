@@ -143,7 +143,6 @@ class KMDScraper:
         return votes_merged
 
     def get_letters(self, url, region_url):
-        self.logger.info(f'Fetching party letters')
         resp = req_trys(url, self.logger)
         soup = BeautifulSoup(resp.content, "html.parser")
         results = soup.find("div", class_='col-xs-12 col-sm-6 col-md-8 content-block kmd-parti-list')
@@ -160,9 +159,9 @@ class KMDScraper:
         return parti_bogstaver
 
     def get_letters_kvrv(self, url, regions):
-        self.logger.info(f'Fetching party letters')
         parti_bogstaver_all = pd.DataFrame()
         for _, row in regions.iterrows():
+            self.logger.info(f'Fetching party letters for {row.region}')
             parti_bogstaver = self.get_letters(f'{url}{row.url}.htm', row.url)
             parti_bogstaver['url'] = row.url
             parti_bogstaver_all = pd.concat([parti_bogstaver_all, parti_bogstaver])
