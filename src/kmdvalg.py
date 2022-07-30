@@ -70,7 +70,7 @@ class KMDValg:
             ).drop(['masterurl', 'url_w'], axis=1)
         elif valg.lower() == 'ft':
             local_areas['tmp'] = letters['tmp'] = 1
-            area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
+            area_parties = local_areas.merge(letters.drop('url', axis=1), on='tmp').drop('tmp', axis=1)
         else:
             return pd.DataFrame()
 

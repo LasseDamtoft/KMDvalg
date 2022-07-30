@@ -84,20 +84,20 @@ class KMDScraper:
 
         search_df_res = pd.concat(search_df_loop)
         further_search = search_df_res[search_df_res.url != search_df_res.parent_url].drop('parent_url', axis=1).copy()
-        search_df_res = search_df_res.drop('parent_url', axis=1)
         if not further_search.empty:
             search_sub = self.areas(further_search, level=level + 1)
             search_df_res = search_sub.merge(
                 search_df_res,
-                left_on='parent',
-                right_on='area',
+                left_on='parent_url',
+                right_on='url',
                 how='outer',
                 suffixes=[f'_bot{level}', '']
-            )
+            ).drop(f'parent_url_bot{level}', axis=1)
         return search_df_res
 
     def area_wrap(self, search_df):
         res = self.areas(search_df)
+        res = res.drop('parent_url', axis=1)
         search_df_res = res.merge(
             search_df,
             left_on='parent',
