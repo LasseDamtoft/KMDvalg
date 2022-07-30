@@ -141,6 +141,7 @@ class KMDValg:
             'parent'
         )].copy()
         hierachy.columns = ['stemmested', 'kommune']
+        kommuner_df.columns = ['region', 'url']
         hierachy['url'] = search_df_res.iloc[:, 1:2]
         bot_res = search_df_res.iloc[:, :2].copy()
         bot_res.columns = ['area', 'url']
