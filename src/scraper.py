@@ -35,6 +35,7 @@ class KMDScraper:
                 }
             )
         search_df_loop['parent'] = row.area
+        search_df_loop['parent_url'] = row.url
         return search_df_loop
 
     @staticmethod
@@ -82,7 +83,8 @@ class KMDScraper:
                 search_df_loop.append(res)
 
         search_df_res = pd.concat(search_df_loop)
-        further_search = search_df_res[search_df_res.area != search_df_res.parent].copy()
+        further_search = search_df_res[search_df_res.url != search_df_res.parent_url].drop('parent_url', axis=1).copy()
+        search_df_res = search_df_res.drop('parent_url', axis=1)
         if not further_search.empty:
             search_sub = self.areas(further_search, level=level + 1)
             search_df_res = search_sub.merge(
