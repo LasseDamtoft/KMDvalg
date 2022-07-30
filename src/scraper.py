@@ -108,7 +108,14 @@ class KMDScraper:
         search_df_res.loc[:, search_df_res.columns.str.contains('area')] = temp.fillna(method='bfill').T
         temp = search_df_res.loc[:, search_df_res.columns.str.contains('parent')].T
         search_df_res.loc[:, search_df_res.columns.str.contains('parent')] = temp.fillna(method='bfill').T
-        search_df_res = search_df_res[(search_df_res.url_bot1 == search_df_res.url_bot0)].reset_index(drop=True).copy()
+        if 'url_bot1' in search_df_res.columns:
+            search_df_res = search_df_res[(search_df_res.url_bot1 == search_df_res.url_bot0)].reset_index(
+                drop=True
+            ).copy()
+        else:
+            search_df_res = search_df_res[(search_df_res.url_bot == search_df_res.url_bot0)].reset_index(
+                drop=True
+            ).copy()
         return search_df_res
 
     def fetch_candidate_votes(self, area_parties):
@@ -149,3 +156,12 @@ class KMDScraper:
             }
         )
         return parti_bogstaver
+
+    def get_letters_kvrv(self, url, regions):
+        self.logger.info(f'Fetching party letters')
+        parti_bogstaver_all = pd.DataFrame()
+        for _, row in regions.iterrows():
+            parti_bogstaver = self.get_letters(f'{url}{row.url}.htm', row.url)
+            parti_bogstaver['url'] = row.url
+            parti_bogstaver_all = pd.concat([parti_bogstaver_all, parti_bogstaver])
+        return parti_bogstaver_all

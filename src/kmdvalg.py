@@ -11,76 +11,79 @@ class KMDValg:
         self,
         logger,
         processes=12,
-        region_url='R84712',
         base_url_rv='https://www.kmdvalg.dk/rv/2021/',
-        base_url_ft='https://www.kmdvalg.dk/fv/2019/'
+        base_url_kv='https://www.kmdvalg.dk/kv/2021/',
+        base_url_ft='https://www.kmdvalg.dk/fv/2019/',
+        filename='personlige_stemmer_pr_stemmested'
     ):
         self.logger = logger
         self.base_url_rv = base_url_rv
+        self.base_url_kv = base_url_kv
         self.base_url_ft = base_url_ft
-        self.region_url = region_url
         self.processes = processes
+        self.filename = filename
 
-    def scrape_kv_to_csv(self, path='personlige_stemmer_pr_stemmested.csv'):
+    def scrape_general(self, valg):
         time_start = pd.Timestamp.utcnow()
-        kmd_scraper = KMDScraper(self.logger, self.processes, self.base_url_rv)
-        letters = kmd_scraper.get_letters(f'{self.base_url_rv}{self.region_url}.htm', self.region_url)
-        local_areas, hierachy = self.get_areas_kv(kmd_scraper)
-        local_areas['tmp'] = letters['tmp'] = 1
-        area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
+        if isinstance(valg, list):
+            res_all = pd.DataFrame()
+            for val in valg:
+                res_all = pd.concat([res_all, self.scrape_general(val)], axis=0, ignore_index=True)
+            return res_all
+        if valg.lower() == 'kv':
+            baseurl = self.base_url_kv
+            getareas = self.get_areas_kv
+            og_cols = ['kommune', 'stemmested', 'parti', 'url_letter', 'name', 'personal_votes']
+            new_cols = ['kommune', 'stemmested', 'parti', 'partibogstav', 'kandidat_navn', 'personlige_stemmer']
+            file_ext = 'KV'
+        elif valg.lower() == 'rv':
+            baseurl = self.base_url_rv
+            getareas = self.get_areas_rv
+            og_cols = ['kommune', 'stemmested', 'region', 'parti', 'url_letter', 'name', 'personal_votes']
+            new_cols = [
+                'kommune', 'stemmested', 'region', 'parti', 'partibogstav', 'kandidat_navn', 'personlige_stemmer'
+            ]
+            file_ext = 'RV'
+        elif valg.lower() == 'ft':
+            baseurl = self.base_url_ft
+            getareas = self.get_areas_ft
+            og_cols = ['stemmested', 'kommune', 'kreds', 'storkreds', 'parti', 'url_letter', 'name', 'personal_votes']
+            new_cols = [
+                'stemmested', 'kommune', 'kreds', 'storkreds', 'parti', 'partibogstav', 'kandidat_navn',
+                'personlige_stemmer'
+            ]
+            file_ext = 'FT'
+        else:
+            self.logger.warning(f'Invalid valg entered. Should be kv/rv/ft')
+            return pd.DataFrame()
+        self.logger.info(
+            f'Fetching results for {file_ext}'
+        )
+        kmd_scraper = KMDScraper(self.logger, self.processes, baseurl)
+        if valg.lower() == 'kv' or valg.lower() == 'rv':
+            local_areas, hierachy, areas_with_distinct_parties = getareas(kmd_scraper)
+            letters = kmd_scraper.get_letters_kvrv(f'{baseurl}', areas_with_distinct_parties)
+            local_areas['masterurl'] = local_areas.url.str[0:letters.url.str.len().unique().item()]
+            area_parties = local_areas.merge(
+                letters, left_on='masterurl', right_on='url', suffixes=('', '_w'), how='left'
+            ).drop(['masterurl', 'url_w'], axis=1)
+        elif valg.lower() == 'ft':
+            letters = kmd_scraper.get_letters(f'{baseurl}F1003.htm', 'F1003')
+            local_areas, hierachy = getareas(kmd_scraper)
+            local_areas['tmp'] = letters['tmp'] = 1
+            area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
+        else:
+            return pd.DataFrame()
         votes = kmd_scraper.fetch_candidate_votes(area_parties)
         votes_hierachy = votes.merge(hierachy, on='url')
-        votes_csv_ready = votes_hierachy[
-            ['kommune', 'stemmested', 'parti', 'url_letter', 'name', 'personal_votes']
-        ].copy()
-        votes_csv_ready.columns = [
-            'kommune', 'stemmested', 'parti', 'partibogstav', 'kandidat_navn', 'personlige_stemmer'
-        ]
-        votes_csv_ready.to_csv(f'{self.region_url}_2{path}')
+        votes_csv_ready = votes_hierachy[og_cols].copy()
+        votes_csv_ready.columns = new_cols
+        votes_csv_ready.to_csv(f'{self.filename}_{file_ext}.csv')
         self.logger.info(
-            f'Fetched results in {np.round((pd.Timestamp.utcnow() - time_start).value / 1000000000, 2)} seconds'
+            f'Fetched {file_ext} results in {np.round((pd.Timestamp.utcnow() - time_start).value / 1000000000, 2)} '
+            f'seconds'
         )
         return votes_csv_ready
-
-    def scrape_ft_to_csv(self, path='personlige_stemmer_pr_stemmested.csv'):
-        time_start = pd.Timestamp.utcnow()
-        kmd_scraper = KMDScraper(self.logger, self.processes, self.base_url_ft)
-        letters = kmd_scraper.get_letters(f'{self.base_url_ft}F1003.htm', 'F1003')
-        local_areas, hierachy = self.get_areas_ft(kmd_scraper)
-        local_areas['tmp'] = letters['tmp'] = 1
-        area_parties = local_areas.merge(letters, on='tmp').drop('tmp', axis=1)
-        votes = kmd_scraper.fetch_candidate_votes(area_parties)
-        votes_hierachy = votes.merge(hierachy, on='url')
-        votes_csv_ready = votes_hierachy[
-            ['stemmested', 'kommune', 'kreds', 'storkreds', 'parti', 'url_letter', 'name', 'personal_votes']
-        ].copy()
-        votes_csv_ready.columns = [
-            'stemmested', 'kommune', 'kreds', 'storkreds', 'parti', 'partibogstav', 'kandidat_navn',
-            'personlige_stemmer'
-        ]
-        votes_csv_ready.to_csv(f'{path}')
-        self.logger.info(
-            f'Fetched results in {np.round((pd.Timestamp.utcnow() - time_start).value / 1000000000, 2)} seconds'
-        )
-        return votes_csv_ready
-
-    def get_areas_kv(self, kmd_scraper):
-        search_df = pd.DataFrame(
-            {
-                'area': ['all'],
-                'url': [self.region_url]
-            }
-        )
-        search_df_res = kmd_scraper.area_wrap(search_df)
-
-        hierachy = search_df_res.loc[:, search_df_res.columns.str.contains('parent')].copy()
-        hierachy = hierachy.iloc[:, 0:2]
-        hierachy.columns = ['stemmested', 'kommune']
-        hierachy['url'] = search_df_res.iloc[:, 1:2]
-        hierachy = hierachy.fillna({'stemmested': hierachy.kommune}).drop_duplicates()
-        bot_res = search_df_res.iloc[:, :2].copy()
-        bot_res.columns = ['area', 'url']
-        return bot_res, hierachy
 
     def get_areas_ft(self, kmd_scraper):
         resp = req_trys('https://www.kmdvalg.dk/fv/2019/KMDValgFV.html', self.logger)
@@ -111,3 +114,66 @@ class KMDValg:
         bot_res = search_df_res.iloc[:, :2].copy()
         bot_res.columns = ['area', 'url']
         return bot_res, hierachy
+
+    def get_areas_rv(self, kmd_scraper, url='https://www.kmdvalg.dk/rv/2021/KMDValgRV.html'):
+        resp = req_trys(url, self.logger)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
+        regioner = all_results.find_all(class_='list-group-item')
+        regioner_df = pd.DataFrame(
+            {
+                f'area': [st.text.strip() for st in regioner],
+                'url': [
+                    st.get('href').replace('.htm', '').strip() if isinstance(
+                        st.get('href'), str
+                    ) else st.get('href') for st in regioner
+                ]
+            }
+        )
+        regioner_df['region'] = np.where(
+            regioner_df.url.str.len() == regioner_df.url.str.len().min(),
+            regioner_df.area,
+            np.nan
+        )
+        regioner_df['region'] = regioner_df['region'].fillna(method='ffill')
+        region_url = regioner_df[(regioner_df.url.str.len() == regioner_df.url.str.len().min())].copy()
+        kommuner_df = regioner_df[~(regioner_df.url.str.len() == regioner_df.url.str.len().min())].copy()
+        search_df_res = kmd_scraper.area_wrap(kommuner_df)
+
+        hierachy = search_df_res.loc[:, search_df_res.columns.str.contains(
+            'parent'
+        ) | search_df_res.columns.str.contains('region')
+        ].copy().sort_values(['region', 'parent'])
+        hierachy.columns = ['stemmested', 'kommune', 'region']
+        hierachy['url'] = search_df_res.iloc[:, 1:2]
+        bot_res = search_df_res.iloc[:, :2].copy()
+        bot_res.columns = ['area', 'url']
+        return bot_res, hierachy, region_url
+
+    def get_areas_kv(self, kmd_scraper, url='https://www.kmdvalg.dk/kv/2021/KMDValgKV.html'):
+        resp = req_trys(url, self.logger)
+        soup = BeautifulSoup(resp.content, "html.parser")
+        all_results = soup.find(class_='col-sm-12 content-block kmd-list-items')
+        kommuner = all_results.find_all(class_='list-group-item')
+        kommuner_df = pd.DataFrame(
+            {
+                f'area': [st.text.strip() for st in kommuner],
+                'url': [
+                    st.get('href').replace('.htm', '').strip() if isinstance(
+                        st.get('href'), str
+                    ) else st.get('href') for st in kommuner
+                ]
+            }
+        )
+
+        kommuner_df = kommuner_df[~kommuner_df.url.isna()].copy().reset_index(drop=True)
+        search_df_res = kmd_scraper.area_wrap(kommuner_df)
+
+        hierachy = search_df_res.loc[:, search_df_res.columns.str.contains(
+            'parent'
+        )].copy()
+        hierachy.columns = ['stemmested', 'kommune']
+        hierachy['url'] = search_df_res.iloc[:, 1:2]
+        bot_res = search_df_res.iloc[:, :2].copy()
+        bot_res.columns = ['area', 'url']
+        return bot_res, hierachy, kommuner_df
